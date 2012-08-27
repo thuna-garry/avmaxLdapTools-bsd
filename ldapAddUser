@@ -1,0 +1,132 @@
+#! /usr/bin/python
+
+import sys
+import ldap
+from ldapConf import *
+from optparse import OptionParser
+
+from ldapConf import *
+from ldapUtil import *
+
+
+####################################################################################
+# global constants
+####################################################################################
+version="%prog: v0.82 (2011-Nov-27)"
+modifiedBy="Garry Thuna"
+
+
+###################################################################################
+# parse command line options
+###################################################################################
+usage = "usage: %prog [options] [hostUri] [bindDN] [bindPW]" 
+description = "Create a user in " + BASE_DN
+parser = OptionParser(usage=usage, version=version, description=description)
+parser.add_option("-H", action="store", type="string", dest="hostUri",
+                        help="LDAP Uniform Resource Identifier (eg. ldaps://ldapServer:port)")
+parser.add_option("-D", action="store", type="string", dest="bindDN", help="bind DN")
+parser.add_option("-w", action="store", type="string", dest="bindPass", help="bind password")
+(options, args) = parser.parse_args()
+
+####################################################################################
+# gather the user input
+####################################################################################
+if options.hostUri:
+    hostUri = options.hostUri
+elif len(args) >= 1:
+    hostUri = args[0]
+else: 
+    hostUri = "ldaps://example.com:636"
+input = raw_input('host URI [{0}]: '.format(hostUri)).strip()
+if len(input) != 0:
+    hostUri = input
+
+if options.bindDN:
+    bindDN = options.bindDN
+elif len(args) >= 2:
+    bindDN = args[1]
+else: 
+    bindDN = ""
+input = raw_input('bind DN [{0}]: '.format(bindDN)).strip()
+if len(input) != 0:
+    bindDN = input
+
+if options.bindPass:
+    bindPass = options.bindPass
+elif len(args) >= 3:
+    bindPass = args[2]
+else: 
+    bindPass = raw_input('bind password: ')
+
+givenNames = raw_input('given names: ')
+surName = raw_input('surname: ')
+
+uid = givenNames[0].lower() + surName.lower()
+input = raw_input('uid [{0}]: '.format(uid)).lower().strip()
+if len(input) != 0:
+    uid = input
+
+mail = '{0}@{1}'.format(uid, MAIL_DOMAIN)  
+input = raw_input('email [{0}]: '.format(mail)).strip()
+if len(input) != 0:
+    mail = input
+
+homeServer = SERVER_SHORT_NAME
+input = raw_input('home server common name [{0}]: '.format(homeServer))
+if len(input) != 0:
+    homeServer = input
+
+
+####################################################################################
+# bind to the ldap server
+#     do the preliminary procssing of users and groups
+#     do the preliminary procssing of workspaces
+####################################################################################
+con = ldap.initialize(hostUri)
+con.start_tls_s()
+con.simple_bind_s(bindDN, bindPass)
+
+groups,                \
+    users,             \
+     gnum2idx,         \
+     gid2idx,          \
+     uid2idx,          \
+     belongsTo,        \
+    workspaces,        \
+     awsName2ws,       \
+     awsName2path,     \
+     gnum2awsName,     \
+    servers,           \
+     asName2server  = preProcessLdapObjects(con)
+
+# calc the maximum uidNumber
+maxUidNumber = 0 
+for u in users:
+    cur = int(u[1]['uidNumber'][0])
+    if cur > maxUidNumber:
+        maxUidNumber = cur
+uidNumber = maxUidNumber + 1
+
+# setup the entry's attributes
+dn = USER_DN_FMT.format(uid)
+ur = list()
+ur.append( ('objectClass', ['sambaSamAccount', 'posixAccount', 'person', 'organizationalPerson', 'inetOrgPerson']) )
+ur.append( ('uid',                  [uid])                                                      )
+ur.append( ('cn',                   [givenNames.lower() + ' ' + surName.lower()])               )  
+ur.append( ('sn',                   [surName])                                                  )  
+ur.append( ('mail',                 [mail])                                                     )  
+ur.append( ('uidNumber',            ['{0}'.format(uidNumber)])                                  )  
+ur.append( ('sambaSID',             ['S-1-5-21-12345-1-{0}'.format(uidNumber * 2)])             ) 
+ur.append( ('loginShell',           ['/sbin/nologin'])                                          )
+ur.append( ('gidNumber',            ['6001'])                                                   )
+ur.append( ('homeDirectory',        ['_none_'])                                                 )
+ur.append( ('sambaAcctFlags',       ['[UX         ]'])                                          )
+ur.append( ('sambaHomePath',        ['\\\\{0}.{1}\{2}'.format(homeServer, DOMAIN, uid)])        )
+ur.append( ('sambaLMPassword',      ['change_me'])                                              )
+ur.append( ('sambaNTPassword',      ['8846f7eaee8fb117ad06bdd830b7586c'])                       )
+ur.append( ('sambaPrimaryGroupSID', ['S-1-5-21-12345-1-12003'])                                 )
+ur.append( ('userPassword',         ['e1NTSEF9NitmNjNMWW5Jb0J1Z214eUtaK2Q1NTVzNVVLMk5uY3k='])   )
+
+con.add_s(dn, ur)
+con.unbind_s()
+
