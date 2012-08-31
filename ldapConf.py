@@ -14,7 +14,7 @@ modifiedBy="Garry Thuna"
 ####################################################################################
 ORGANIZATION = 'avmaxGroup'
 DOMAIN = 'avmaxGroup.com'
-SERVER_SHORT_NAME = 'files2.gtf'
+SERVER_SHORT_NAME = 'files2.yul'
 MASTER_SHORT_NAME = 'dirSrv1.yyc'
 
 
@@ -29,7 +29,7 @@ BASE_DN_SERVER  = 'asName=' + SERVER_SHORT_NAME + ',ou=servers,' + BASE_DN
 
 BIND_URI = 'ldapi://'
 BIND_DN  = 'uid=serverAuth,ou=bindAccounts,asName=' + SERVER_SHORT_NAME + ',ou=servers,' + BASE_DN
-BIND_PW  = 'trSA63FfhHbs'
+BIND_PW  = 'VajmTuwPkEyC'
 
 USER_DN_FMT  = 'uid={0},ou=users,' + BASE_DN
 GROUP_DN_FMT = 'cn={0},ou=groups,' + BASE_DN
